@@ -3,11 +3,26 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field, asdict
 from datetime import datetime
+from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 # Current year constant
 CURRENT_YEAR = datetime.now().year
+
+
+class ExecutionMode(str, Enum):
+    """Execution mode for the workflow."""
+    AUTO = "auto"           # 全自动模式：各阶段自动流转
+    SEMI_AUTO = "semi-auto"  # 半自动模式：指定阶段暂停等待用户确认
+
+
+class PausePoint(str, Enum):
+    """Pause points in semi-auto mode."""
+    AFTER_PLANNING = "after_planning"    # 规划后暂停，审核检索策略
+    AFTER_SCREENING = "after_screening"  # 筛选后暂停，审核文献列表
+    AFTER_WRITING = "after_writing"      # 撰写后暂停，审核初稿
+    AFTER_REVIEW = "after_review"        # 审稿后暂停，审核修订稿
 
 
 @dataclass
@@ -33,12 +48,38 @@ class RunConfig:
     request_timeout: int = 30
     minimum_acceptable_refs: int = 35
     old_paper_ratio_limit: float = 0.15
+    # 半自动模式配置
+    mode: str = ExecutionMode.AUTO.value  # "auto" | "semi-auto"
+    pause_points: List[str] = field(default_factory=list)  # 暂停点列表
 
     def __post_init__(self) -> None:
         if isinstance(self.output_path, str):
             self.output_path = Path(self.output_path)
         if isinstance(self.output_dir, str):
             self.output_dir = Path(self.output_dir)
+
+    def should_pause_at(self, point: str) -> bool:
+        """Check if workflow should pause at given point."""
+        return self.mode == ExecutionMode.SEMI_AUTO.value and point in self.pause_points
+
+
+@dataclass
+class UserFeedback:
+    """User feedback for a paused stage."""
+
+    action: str  # "continue" | "revise" | "abort" | "chat"
+    modifications: Dict[str, Any] = field(default_factory=dict)
+    chat_message: str = ""  # 用户与 AI 对话的消息
+    chat_response: str = ""  # AI 的回复
+
+    # 规划阶段修改
+    updated_keywords: List[str] = field(default_factory=list)
+    updated_search_terms: List[str] = field(default_factory=list)
+    updated_sections: List[Dict[str, Any]] = field(default_factory=list)
+
+    # 筛选阶段修改
+    added_paper_ids: List[str] = field(default_factory=list)
+    removed_paper_ids: List[str] = field(default_factory=list)
 
 
 @dataclass

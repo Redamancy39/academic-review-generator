@@ -392,6 +392,7 @@ class WorkflowRunner:
         progress_callback: Optional[Callable[[str, str, float], None]] = None,
         source_progress_callback: Optional[Callable[[str, str, int, Optional[str]], None]] = None,
         stage_data_callback: Optional[Callable[[str, Dict[str, Any]], None]] = None,
+        pause_callback: Optional[Callable[[str, Dict[str, Any]], None]] = None,
         enable_checkpoint: bool = True,
         enable_quality_gate: bool = True,
         max_iterations_per_stage: int = 2,
@@ -405,6 +406,7 @@ class WorkflowRunner:
             progress_callback: Optional callback for progress updates.
             source_progress_callback: Optional callback for per-source retrieval progress.
             stage_data_callback: Optional callback for intermediate stage data (for frontend display).
+            pause_callback: Optional callback for pausing in semi-auto mode.
             enable_checkpoint: Whether to enable checkpointing (default True).
             enable_quality_gate: Whether to enable quality gate checks (default True).
             max_iterations_per_stage: Maximum iterations per stage before giving up.
@@ -415,6 +417,7 @@ class WorkflowRunner:
         self.progress_callback = progress_callback
         self.source_progress_callback = source_progress_callback
         self.stage_data_callback = stage_data_callback
+        self.pause_callback = pause_callback
         self.enable_checkpoint = enable_checkpoint
         self.enable_quality_gate = enable_quality_gate
         self.max_iterations_per_stage = max_iterations_per_stage
@@ -441,6 +444,10 @@ class WorkflowRunner:
         self.stage_iterations: Dict[str, int] = {}
         self.gate_history: List[Dict[str, Any]] = []
 
+        # 半自动模式状态
+        self.is_paused = False
+        self.pause_reason: Optional[str] = None
+
     def _report_progress(self, stage: str, message: str, progress: float) -> None:
         """Report progress to callback if available."""
         if self.progress_callback:
@@ -453,6 +460,27 @@ class WorkflowRunner:
                 self.stage_data_callback(stage, data)
             except Exception as e:
                 print(f"[WorkflowRunner] stage_data_callback error: {e}")
+
+    def _check_pause_and_wait(self, pause_point: str, pause_data: Dict[str, Any]) -> bool:
+        """Check if workflow should pause at this point and wait for user action.
+
+        Args:
+            pause_point: The pause point identifier (e.g., "after_planning").
+            pause_data: Data to pass to the pause callback.
+
+        Returns:
+            True if paused, False if should continue.
+        """
+        if not self.config.should_pause_at(pause_point):
+            return False
+
+        self.is_paused = True
+        self.pause_reason = pause_point
+
+        if self.pause_callback:
+            self.pause_callback(pause_point, pause_data)
+
+        return True
 
     def _save_checkpoint(self, stage: str, progress: float, message: str = "", **kwargs) -> None:
         """Save a checkpoint if enabled."""
@@ -648,6 +676,17 @@ class WorkflowRunner:
                 # 报告章节结构给前端
                 self._report_stage_data("planning", {"sections": plan.get("sections", [])})
                 self._save_checkpoint(CheckpointStage.PLANNING, 0.1, "规划完成", plan=plan)
+
+                # 半自动模式：检查是否需要在规划后暂停
+                if self._check_pause_and_wait("after_planning", {
+                    "plan": plan,
+                    "topic_analysis": to_jsonable(self.topic_analysis),
+                    "plan_sections": plan.get("sections", []),
+                }):
+                    results["paused"] = True
+                    results["pause_reason"] = "after_planning"
+                    return results
+
                 current_stage = CheckpointStage.RETRIEVAL
 
             # ========== RETRIEVAL STAGE ==========
@@ -730,6 +769,18 @@ class WorkflowRunner:
                     CheckpointStage.SCREENING, 0.35, "筛选完成",
                     plan=plan, raw_records=to_jsonable(raw_records), selected_records=results["selected_records"],
                 )
+
+                # 半自动模式：检查是否需要在筛选后暂停
+                if self._check_pause_and_wait("after_screening", {
+                    "selected_records": results["selected_records"],
+                    "raw_records": results.get("raw_records", []),
+                    "total_selected": len(selected_records),
+                    "total_retrieved": len(raw_records),
+                }):
+                    results["paused"] = True
+                    results["pause_reason"] = "after_screening"
+                    return results
+
                 current_stage = CheckpointStage.ANALYSIS
 
             # ========== ANALYSIS STAGE ==========

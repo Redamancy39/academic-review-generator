@@ -63,6 +63,56 @@
 
       <el-collapse v-model="activeCollapse">
         <el-collapse-item title="高级设置" name="advanced">
+          <!-- 执行模式选择 -->
+          <el-row :gutter="20">
+            <el-col :span="24">
+              <el-form-item label="执行模式">
+                <el-radio-group v-model="formData.mode" @change="handleModeChange">
+                  <el-radio value="auto">
+                    <div class="mode-option">
+                      <span class="mode-label">全自动模式</span>
+                      <span class="mode-desc">一键生成，各阶段自动流转</span>
+                    </div>
+                  </el-radio>
+                  <el-radio value="semi-auto">
+                    <div class="mode-option">
+                      <span class="mode-label">半自动模式</span>
+                      <span class="mode-desc">每个阶段人工审核确认</span>
+                    </div>
+                  </el-radio>
+                </el-radio-group>
+              </el-form-item>
+            </el-col>
+          </el-row>
+
+          <!-- 半自动模式暂停点选择 -->
+          <el-row v-if="formData.mode === 'semi-auto'" :gutter="20">
+            <el-col :span="24">
+              <el-form-item label="审核检查点">
+                <el-checkbox-group v-model="formData.pause_points">
+                  <el-checkbox value="after_planning">
+                    <div class="pause-option">
+                      <span class="pause-label">规划后审核</span>
+                      <span class="pause-desc">审核检索策略和章节结构</span>
+                    </div>
+                  </el-checkbox>
+                  <el-checkbox value="after_screening">
+                    <div class="pause-option">
+                      <span class="pause-label">筛选后审核</span>
+                      <span class="pause-desc">审核文献列表，可增删文献</span>
+                    </div>
+                  </el-checkbox>
+                </el-checkbox-group>
+                <div class="form-tip">
+                  <el-icon><InfoFilled /></el-icon>
+                  <span>未选择检查点时，默认在所有检查点暂停</span>
+                </div>
+              </el-form-item>
+            </el-col>
+          </el-row>
+
+          <el-divider />
+
           <el-row :gutter="20">
             <el-col :span="12">
               <el-form-item label="字数范围">
@@ -179,6 +229,9 @@ const formData = reactive({
   year_window: 5,
   review_rounds_min: 2,
   review_rounds_max: 3,
+  // 半自动模式配置
+  mode: 'auto',
+  pause_points: [],
 })
 
 const wordCountRange = computed({
@@ -205,6 +258,13 @@ const rules = {
 }
 
 const formatWordCount = (val) => `${val} 字`
+
+const handleModeChange = (val) => {
+  if (val === 'semi-auto' && formData.pause_points.length === 0) {
+    // 默认选中所有检查点
+    formData.pause_points = ['after_planning', 'after_screening']
+  }
+}
 
 const handleSubmit = async () => {
   if (!formRef.value) return
@@ -247,5 +307,57 @@ const handleSubmit = async () => {
 .submit-btn .el-button {
   width: 100%;
   max-width: 300px;
+}
+
+/* 执行模式选项样式 */
+.mode-option {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+
+.mode-label {
+  font-weight: 500;
+}
+
+.mode-desc {
+  font-size: 12px;
+  color: #909399;
+}
+
+/* 暂停点选项样式 */
+.pause-option {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+
+.pause-label {
+  font-weight: 500;
+}
+
+.pause-desc {
+  font-size: 12px;
+  color: #909399;
+}
+
+/* Radio 和 Checkbox 组样式 */
+:deep(.el-radio-group) {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+:deep(.el-checkbox-group) {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+:deep(.el-radio), :deep(.el-checkbox) {
+  height: auto;
+  align-items: flex-start;
 }
 </style>

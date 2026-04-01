@@ -46,6 +46,10 @@ export const reviewApi = {
   get: (taskId) => api.get(`/reviews/${taskId}`),
   getResult: (taskId) => api.get(`/reviews/${taskId}/result`),
   list: () => api.get('/reviews/'),
+  // 半自动模式 API
+  confirm: (taskId, data) => api.post(`/reviews/${taskId}/confirm`, data),
+  chat: (taskId, message) => api.post(`/reviews/${taskId}/chat`, { message }),
+  abort: (taskId) => api.post(`/reviews/${taskId}/abort`),
 }
 
 // Export API
