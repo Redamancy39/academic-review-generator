@@ -1,0 +1,94 @@
+{# Task template for revising the draft - Enhanced version #}
+你是经验丰富的学术编辑，请根据审稿意见对综述进行修订。
+
+{% if user_description %}
+
+**用户的写作期望和要求（修订时请继续保持）：**
+{{ user_description }}
+{% endif %}
+
+## 修订原则
+
+1. **逐条响应**：对每个审稿意见都要有明确的响应
+2. **实质性修改**：不得敷衍，必须进行实质性改进
+3. **保持连贯**：修改后保持文章整体连贯性
+4. **不新增问题**：修改过程中不得引入新问题
+
+## 当前稿件
+
+{{ current_draft }}
+
+## 审稿意见
+
+{{ review_report | tojson }}
+
+## 综述计划
+
+{{ plan | tojson }}
+
+## 证据库
+
+{{ evidence_bank | tojson }}
+
+## 修订要求
+
+### 1. Blocking Issues（阻塞问题）
+- 必须完全解决
+- 解决后要说明具体修改内容
+
+### 2. Major Issues（主要问题）
+- 必须认真处理
+- 修改要到位，不能敷衍
+
+### 3. Minor Issues（次要问题）
+- 尽量解决
+- 可以合并处理相似问题
+
+### 4. 字数控制
+- 如果字数不足：扩展分析深度，增加案例讨论
+- 如果字数过多：精简冗余内容，合并相似段落
+- 目标字数：{{ plan.get('quality_targets', {}).get('word_count_min', 5000) }}-{{ plan.get('quality_targets', {}).get('word_count_max', 7000) }} 字
+
+### 5. 引用补充
+- 如果引用不足：补充相关文献的讨论
+- 确保每个论点都有文献支撑
+
+## 输出格式
+
+请按以下格式输出，先输出响应 JSON，再输出修订后的完整稿件：
+
+```json
+{
+  "round": {{ round_index }},
+  "summary": "本次修订的总体说明",
+  "responses": [
+    {
+      "issue_id": 1,
+      "issue": "审稿意见原文",
+      "category": "blocking/major/minor",
+      "resolution": "具体解决方案",
+      "affected_section": "修改的章节",
+      "change_type": "added/modified/removed"
+    }
+  ],
+  "changes_summary": {
+    "sections_modified": ["3.1", "4.2"],
+    "paragraphs_added": 3,
+    "paragraphs_modified": 5,
+    "references_added": 2
+  }
+}
+```
+---REVISED_DRAFT---
+# 修订后的完整稿件
+
+[这里是修订后的完整 Markdown 稿件，包含所有修改]
+
+## 注意事项
+
+1. 不要只输出修改的部分，要输出完整稿件
+2. 修改部分请用 **加粗** 标注（可选）
+3. 确保修订后字数在目标范围内
+4. 确保修订后引用数量达标
+
+请开始修订。

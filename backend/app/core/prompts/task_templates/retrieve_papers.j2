@@ -1,0 +1,90 @@
+{# Task template for retrieval strategy - Enhanced version #}
+你是资深文献检索专家，请基于综述主题优化检索策略。
+
+## 综述主题
+{{ topic }}
+
+## 当前检索计划
+{{ search_queries | tojson }}
+
+## 优化目标
+
+1. **提高相关性**：确保检索结果与研究主题直接相关
+2. **避免泛化**：排除无关领域的文献
+3. **覆盖全面**：确保各个子主题都有文献支撑
+4. **提高效率**：优化检索式，减少噪音
+
+## 检索式优化原则
+
+### 1. 领域限定（关键！）
+- 必须包含领域关键词，避免检索到无关领域
+- 例如：食品领域必须包含 food, meat, fruit 等词
+
+### 2. 精确匹配
+- 使用引号进行精确短语匹配
+- 例如："deep learning" 而非 deep learning
+
+### 3. 布尔运算符使用
+- **AND**：缩小范围（必须同时包含）
+- **OR**：扩展同义词
+- **NOT**：排除无关领域
+
+### 4. 字段限定
+- 优先在标题和摘要中搜索
+- 使用 [Title/Abstract] 标签（PubMed）
+- 使用 title.search 过滤器（OpenAlex）
+
+### 5. 排除策略
+明确排除以下无关领域：
+- 医学临床研究（clinical, patient, diagnosis）
+- 金融经济（financial, stock, investment）
+- 环境监测（climate, pollution, ecosystem）
+- 通信网络（5G, wireless, network）
+
+## 输出要求
+
+**请严格输出纯 JSON 格式，不要包含任何其他文字或解释。**
+
+```json
+{
+  "queries": [
+    {
+      "query": "精确的检索式",
+      "intent": "检索意图说明",
+      "priority": 1,
+      "expected_sources": ["PubMed", "OpenAlex"]
+    }
+  ],
+  "screening_focus": [
+    "筛选时重点关注：方法创新性",
+    "筛选时重点关注：实验设计完整性"
+  ],
+  "source_notes": [
+    "PubMed 适合检索生物医学领域的应用研究",
+    "OpenAlex 覆盖面广，适合扩展检索"
+  ],
+  "exclusion_keywords": [
+    "clinical trial",
+    "patient",
+    "financial"
+  ],
+  "domain_keywords": [
+    "food",
+    "quality",
+    "freshness"
+  ]
+}
+```
+
+## 检索式示例
+
+**好的检索式**：
+- `"food freshness" AND ("deep learning" OR "CNN")`
+- `("meat" OR "fish") AND quality AND detection`
+- `hyperspectral AND food NOT (clinical OR patient)`
+
+**不好的检索式**：
+- `deep learning`（太泛，会检索到各领域的应用）
+- `machine learning algorithm`（纯方法论，无领域限定）
+
+请开始优化检索策略。

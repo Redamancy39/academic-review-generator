@@ -1,0 +1,123 @@
+{# Task template for planning a review #}
+请围绕主题"{{ topic }}"生成一个严格的系统综述执行计划。
+{% if user_description %}
+
+**用户的写作期望和要求：**
+{{ user_description }}
+
+请在规划时充分考虑用户以上述要求，根据用户的具体需求调整章节结构、重点内容和分析方向。
+{% endif %}
+
+约束如下：
+1. 最终文章为{{ language }}，目标期刊类型：{{ journal_type }}，字数 {{ word_count_min }}-{{ word_count_max }}。
+2. 参考文献目标 {{ target_refs }} 篇，近 {{ year_window }} 年优先。
+{% if language == "中文" %}
+3. 文献来源：优先检索中英文数据库，中文文献可从 CNKI、万方等来源，英文文献优先 WOS、PubMed、OpenAlex。
+{% else %}
+3. 文献来源以 WOS 为主，必要时补充 PubMed、OpenAlex、Crossref。
+{% endif %}
+4. 期刊质量优先高影响因子期刊。
+5. 内容必须体现共性、差异、争议、优势、局限、研究空白与未来方向。
+6. 至少规划 3 个表格。
+
+**重要：检索词设计要求（关键！影响文献质量）**
+
+search_queries 字段需要设计多组精确检索式，遵循以下原则：
+
+### 检索式设计原则
+
+1. **领域限定**：必须包含领域关键词，避免检索到无关领域的文献
+   - 例如：食品领域必须包含 food, meat, fruit, vegetable 等词
+
+2. **精确匹配优先**：使用引号进行精确短语匹配
+   - 正确："food freshness" AND "deep learning"
+   - 错误：food freshness deep learning（过于宽泛）
+
+3. **避免泛化**：不要只使用通用的技术术语
+   - 错误：machine learning, neural network, artificial intelligence
+   - 正确："food quality" AND ("machine learning" OR "deep learning")
+
+4. **布尔运算符使用**：
+   - AND：缩小范围（必须同时包含）
+   - OR：扩展同义词
+   - NOT：排除无关领域
+
+### 检索式格式要求
+
+每组检索式包含：
+- query: 精确的检索词组合
+- intent: 该检索式的检索意图说明
+- priority: 优先级（1最高）
+
+### 必须设计的检索类型
+
+1. **核心主题检索**（priority: 1）
+   - 领域关键词 AND 核心技术
+   - 例如："food freshness" AND "deep learning"
+
+2. **具体应用检索**（priority: 1-2）
+   - 具体食品类型 + 检测技术
+   - 例如：("meat" OR "fish") AND "freshness" AND "CNN"
+
+3. **方法技术检索**（priority: 2-3）
+   - 具体技术方法 + 食品领域限定
+   - 例如："hyperspectral imaging" AND "food" AND "quality"
+
+4. **排除无关领域**（在 intent 中说明排除目标）
+   - 使用 NOT 排除明显无关的领域
+   - 例如："food" NOT ("clinical" OR "medical" OR "patient")
+
+### 检索式示例
+
+```json
+{
+  "search_queries": [
+    {
+      "query": "\"food freshness\" AND (\"deep learning\" OR \"convolutional neural network\" OR CNN)",
+      "intent": "核心检索：食品新鲜度与深度学习的交叉研究",
+      "priority": 1
+    },
+    {
+      "query": "(\"meat\" OR \"fish\" OR \"fruit\") AND \"quality\" AND (\"computer vision\" OR \"hyperspectral\")",
+      "intent": "应用检索：具体食品类型的品质检测方法",
+      "priority": 1
+    },
+    {
+      "query": "\"food safety\" AND (\"machine learning\" OR \"artificial intelligence\") NOT (\"clinical\" OR \"patient\")",
+      "intent": "扩展检索：食品安全领域的AI应用，排除医学文献",
+      "priority": 2
+    }
+  ]
+}
+```
+
+**重要：请严格输出纯 JSON 格式，不要包含任何其他文字或解释。**
+
+输出格式示例：
+```json
+{
+  "review_title": "综述标题",
+  "scope_statement": "范围声明",
+  "search_queries": [{"query": "检索式", "intent": "意图", "priority": 1}],
+  "inclusion_rules": ["纳入规则1"],
+  "exclusion_rules": ["排除规则1"],
+  "sections": [
+    {
+      "title": "章节标题",
+      "goal": "章节目标",
+      "target_words": 1000,
+      "key_questions": ["关键问题1"],
+      "must_cover": ["必须覆盖的内容"],
+      "planned_tables": ["计划的表格"]
+    }
+  ],
+  "table_plan": [{"table_id": "表1", "title": "表格标题", "columns": ["列1", "列2"]}],
+  "quality_targets": {
+    "target_refs": {{ target_refs }},
+    "minimum_acceptable_refs": 35,
+    "word_count_min": {{ word_count_min }},
+    "word_count_max": {{ word_count_max }},
+    "year_window": {{ year_window }}
+  }
+}
+```
