@@ -18,6 +18,7 @@ class AgentGenerator:
         "analyzer",
         "writer",
         "reviewer",
+        "polisher",  # 新增：润色 Agent
     ]
 
     def __init__(self, template_dir: Optional[Path] = None) -> None:
@@ -133,6 +134,12 @@ goal: |
   对综述进行苛刻审查，推动多轮修订。
 backstory: |
   你对综述稿件要求近乎苛刻。
+verbose: true""",
+            "polisher": """role: "学术润色专家"
+goal: |
+  对综述稿件进行专业润色，提升语言流畅性、学术规范性和可读性。
+backstory: |
+  你是一位资深的学术编辑，拥有丰富的中英文学术论文润色经验。
 verbose: true""",
         }
         return defaults.get(role, defaults["planner"])

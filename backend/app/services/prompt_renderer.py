@@ -188,6 +188,31 @@ class PromptRenderer:
             "user_description": user_description,
         })
 
+    def render_polish_draft(
+        self,
+        draft: str,
+        topic: str,
+        journal_type: str = "中文核心期刊",
+        language: str = "中文",
+        user_description: str = "",
+    ) -> str:
+        """Render the polish draft prompt.
+
+        Args:
+            draft: The draft content to polish.
+            topic: The review topic.
+            journal_type: Target journal type.
+            language: Review language.
+            user_description: User's writing expectations.
+        """
+        return self.render("polish_draft", {
+            "draft": draft,
+            "topic": topic,
+            "journal_type": journal_type,
+            "language": language,
+            "user_description": user_description,
+        })
+
     def _get_template(self, name: str) -> Template:
         """Get a template by name."""
         template_name = f"{name}.j2"

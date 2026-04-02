@@ -28,6 +28,7 @@ class CheckpointStage:
     ANALYSIS = "analysis"
     WRITING = "writing"
     REVIEW = "review"
+    POLISH = "polish"  # 新增：润色阶段
     FINALIZING = "finalizing"
     COMPLETE = "complete"
 

@@ -842,6 +842,25 @@ class WorkflowRunner:
                 final_draft, reports = await self._run_review_loop(plan, evidence_bank, agents, draft)
                 results["final_draft"] = final_draft
                 results["review_reports"] = [to_jsonable(r) for r in reports]
+                self._save_checkpoint(
+                    CheckpointStage.REVIEW, 0.80, "审稿完成",
+                    plan=plan, selected_records=results["selected_records"],
+                    evidence_bank=evidence_bank, final_draft=final_draft,
+                )
+                current_stage = CheckpointStage.POLISH
+
+            # ========== POLISH STAGE ==========
+            elif current_stage == CheckpointStage.POLISH:
+                self._report_progress("polish", "正在进行专业润色...", 0.85)
+                polished_draft, polish_summary = await self._polish_draft(final_draft, agents)
+                final_draft = polished_draft
+                results["final_draft"] = final_draft
+                results["polish_summary"] = polish_summary
+                self._save_checkpoint(
+                    CheckpointStage.POLISH, 0.90, "润色完成",
+                    plan=plan, selected_records=results["selected_records"],
+                    final_draft=final_draft,
+                )
                 current_stage = CheckpointStage.FINALIZING
 
             # ========== FINALIZING STAGE ==========
@@ -1387,6 +1406,52 @@ class WorkflowRunner:
             current_round += 1
 
         return current_draft, reports
+
+    async def _polish_draft(
+        self,
+        draft: str,
+        agents: Dict[str, Any],
+    ) -> Tuple[str, Dict[str, Any]]:
+        """Polish the draft for language quality.
+
+        Args:
+            draft: The draft content to polish.
+            agents: Dictionary of agents.
+
+        Returns:
+            Tuple of (polished_draft, polish_summary).
+        """
+        prompt = self.prompt_renderer.render_polish_draft(
+            draft=draft,
+            topic=self.config.topic,
+            journal_type=self.config.journal_type,
+            language=self.config.language,
+            user_description=self.config.user_description,
+        )
+
+        polish_raw = self._execute_agent(
+            agents["polisher_agent"],
+            prompt,
+            "润色后的 Markdown 稿件和润色说明 JSON。",
+            stage="polish",
+        )
+
+        # 解析润色结果
+        result = safe_json_loads(polish_raw)
+
+        if isinstance(result, dict) and "polished_draft" in result:
+            polished_draft = result.get("polished_draft", draft)
+            polish_summary = result.get("polish_summary", {})
+        else:
+            # 如果 JSON 解析失败，尝试提取 Markdown
+            _, polished_draft = split_revision_payload(polish_raw)
+            polish_summary = {"raw_response": polish_raw[:500]}
+
+        # 保存润色后的稿件
+        self._save_text("polished_draft.md", polished_draft)
+        self._save_json("polish_summary.json", polish_summary)
+
+        return polished_draft, polish_summary
 
     def _finalize(
         self,
