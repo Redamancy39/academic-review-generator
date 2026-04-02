@@ -903,6 +903,9 @@ def run_review_task(task_id: str, request: ReviewCreateRequest) -> None:
             review_rounds_max=request.review_rounds_max,
             output_dir=output_dir,
             output_path=output_dir / "final_review.md",
+            # 半自动模式配置
+            mode=request.mode,
+            pause_points=request.pause_points,
         )
 
         # Progress callback
@@ -974,6 +977,17 @@ def run_review_task(task_id: str, request: ReviewCreateRequest) -> None:
                 if "draft" in data:
                     task["draft_preview"] = data["draft"][:500] + "..." if len(data["draft"]) > 500 else data["draft"]
 
+        # Pause callback for semi-auto mode
+        def pause_callback(pause_reason: str, pause_data: Dict[str, Any]) -> None:
+            """暂停回调 - 当工作流需要暂停时调用"""
+            task["is_paused"] = True
+            task["pause_reason"] = pause_reason
+            task["awaiting_user_action"] = True
+            task["status"] = "paused"
+            task["message"] = f"已在 {pause_reason} 阶段暂停，等待用户审核确认"
+            # 更新暂停阶段的数据
+            task.update(pause_data)
+
         # Run workflow
         runner = WorkflowRunner(
             config=config,
@@ -982,6 +996,7 @@ def run_review_task(task_id: str, request: ReviewCreateRequest) -> None:
             progress_callback=progress_callback,
             source_progress_callback=source_progress_callback,
             stage_data_callback=stage_data_callback,
+            pause_callback=pause_callback,
         )
 
         # Run in async context
@@ -991,6 +1006,12 @@ def run_review_task(task_id: str, request: ReviewCreateRequest) -> None:
             results = loop.run_until_complete(runner.run())
         finally:
             loop.close()
+
+        # Check if paused (semi-auto mode)
+        if results.get("paused"):
+            # 任务已暂停，等待用户确认
+            # pause_callback 已经设置了 task 的状态
+            return
 
         # Store results
         task["status"] = "completed"
@@ -1201,6 +1222,8 @@ def resume_review_task(task_id: str, resume_from_stage: Optional[str] = None) ->
             review_rounds_max=request_data.get("review_rounds_max", 3),
             output_dir=output_dir,
             output_path=output_dir / "final_review.md",
+            mode=request_data.get("mode", "auto"),
+            pause_points=request_data.get("pause_points", []),
         )
 
         # Progress callback
@@ -1220,6 +1243,16 @@ def resume_review_task(task_id: str, resume_from_stage: Optional[str] = None) ->
             }
             task["current_source"] = source if status == "running" else None
 
+        # Pause callback for semi-auto mode
+        def pause_callback(pause_reason: str, pause_data: Dict[str, Any]) -> None:
+            """暂停回调 - 当工作流需要暂停时调用"""
+            task["is_paused"] = True
+            task["pause_reason"] = pause_reason
+            task["awaiting_user_action"] = True
+            task["status"] = "paused"
+            task["message"] = f"已在 {pause_reason} 阶段暂停，等待用户审核确认"
+            task.update(pause_data)
+
         # Run workflow with resume enabled
         runner = WorkflowRunner(
             config=config,
@@ -1227,6 +1260,7 @@ def resume_review_task(task_id: str, resume_from_stage: Optional[str] = None) ->
             wos_api_key=settings.wos_api_key or None,
             progress_callback=progress_callback,
             source_progress_callback=source_progress_callback,
+            pause_callback=pause_callback,
             enable_checkpoint=True,
         )
 
@@ -1239,6 +1273,11 @@ def resume_review_task(task_id: str, resume_from_stage: Optional[str] = None) ->
             )
         finally:
             loop.close()
+
+        # Check if paused (semi-auto mode)
+        if results.get("paused"):
+            # 任务已暂停，等待用户确认
+            return
 
         # Store results
         task["status"] = "completed"

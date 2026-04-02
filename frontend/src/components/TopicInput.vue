@@ -12,6 +12,7 @@
       :model="formData"
       :rules="rules"
       label-position="top"
+      :disabled="isRunning"
     >
       <el-form-item label="研究主题" prop="topic">
         <el-input
