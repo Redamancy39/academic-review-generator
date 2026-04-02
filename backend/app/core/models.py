@@ -193,6 +193,10 @@ class TopicAnalysis:
     search_terms: List[str]
     suggested_sections: List[Dict[str, Any]]
     relevance_hints: List[str]
+    # 新增：结构化概念组
+    concept_groups: Dict[str, List[str]] = field(default_factory=dict)
+    # 概念组类型：required（必选）或 optional（可选应用切面）
+    concept_group_types: Dict[str, str] = field(default_factory=dict)
 
 
 @dataclass

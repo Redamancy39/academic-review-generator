@@ -308,7 +308,7 @@ class TopicParser:
             print("[TopicParser] LLM 配置不完整，回退到规则解析")
             return self.parse(topic, user_description)
 
-        prompt = f"""请分析以下学术综述主题，提取用于文献检索的核心信息。
+        prompt = f"""请分析以下学术综述主题，提炼出用于文献检索的**结构化概念组**。
 
 ## 综述主题
 {topic}
@@ -318,34 +318,92 @@ class TopicParser:
 
 ## 任务要求
 
-请基于主题和用户期望，提炼出用于文献检索的核心信息：
+请基于主题和用户期望，提炼出用于学术数据库检索的**概念组（Concept Groups）**。
 
-1. **keywords（5-8个核心关键词）**：
-   - 必须是能够在学术数据库中检索到的专业术语
-   - 中英文混合，英文优先（因为大多数学术文献是英文）
-   - 避免过于宽泛的词（如"研究"、"应用"）
-   - 必须能准确概括研究主题
+### 概念组设计原则
 
-2. **search_terms（5个精确检索词）**：
-   - 用于在 WOS、PubMed、OpenAlex 等数据库检索
-   - 使用布尔运算符组合关键词
-   - 格式如："food quality" AND "deep learning"
-   - 每个检索词应针对不同的研究方向
+1. **概念组 vs 关键词**：
+   - 概念组是同一概念的多个同义/近义表达
+   - 同一概念组内的词用 OR 连接（扩大检索范围）
+   - 不同概念组之间用 AND 连接（精确检索结果）
 
-3. **domain（主要研究领域）**：
-   - 从以下选项中选择：人工智能、食品安全、生物医学、环境科学、材料科学、能源、计算机科学、化学、物理学、经济学、综合学科
+2. **概念组分类**：
+   - **必选概念组（required）**：定义研究领域的核心概念，必须包含
+   - **可选概念组（optional）**：应用切面/研究方向，根据写作重点选择
 
-4. **sub_domains（2-3个子领域）**：
-   - 该主题涉及的具体研究方向
+3. **概念组命名**：
+   - 使用英文下划线格式，如 `domain_scope`、`ai_core_methods`
+   - 名称要能体现概念组的主题
+
+### 概念组示例
+
+对于一个"人工智能在药食同源研究中的应用"主题：
+
+```json
+{{
+  "concept_groups": {{
+    "domain_scope": {{
+      "terms": ["medicinal food", "medicine food homology", "food and medicine homology", "homology of medicine and food"],
+      "type": "required",
+      "description": "研究领域范围限定"
+    }},
+    "ai_core_methods": {{
+      "terms": ["artificial intelligence", "machine learning", "deep learning", "neural network"],
+      "type": "required",
+      "description": "AI核心方法"
+    }},
+    "bioactive_discovery": {{
+      "terms": ["bioactive compound", "active component", "compound screening", "molecular docking"],
+      "type": "optional",
+      "description": "活性成分发现应用"
+    }},
+    "mechanism_analysis": {{
+      "terms": ["network pharmacology", "knowledge graph", "target prediction", "pathway analysis"],
+      "type": "optional",
+      "description": "作用机制分析应用"
+    }},
+    "quality_evaluation": {{
+      "terms": ["quality evaluation", "quality control", "traceability", "computer vision", "spectroscopy"],
+      "type": "optional",
+      "description": "质量评价与溯源应用"
+    }},
+    "product_development": {{
+      "terms": ["formulation optimization", "recipe optimization", "product development", "functional food"],
+      "type": "optional",
+      "description": "产品研发应用"
+    }}
+  }},
+  "domain": "主要研究领域",
+  "sub_domains": ["子领域1", "子领域2"],
+  "relevance_hints": ["相关性提示1", "相关性提示2"]
+}}
+```
+
+### 设计要点
+
+1. **必选组数量**：通常 2-3 个，定义研究的核心范围
+2. **可选组数量**：通常 3-6 个，覆盖不同的应用切面
+3. **每个概念组的词数**：3-6 个同义/近义词
+4. **术语来源**：优先使用学术数据库中常见的英文术语
 
 ## 输出格式（严格 JSON）
 
 ```json
 {{
+  "concept_groups": {{
+    "概念组名称1": {{
+      "terms": ["术语1", "术语2", "术语3"],
+      "type": "required/optional",
+      "description": "概念组描述"
+    }},
+    "概念组名称2": {{
+      "terms": ["术语1", "术语2"],
+      "type": "required/optional",
+      "description": "概念组描述"
+    }}
+  }},
   "domain": "主要研究领域",
   "sub_domains": ["子领域1", "子领域2"],
-  "keywords": ["关键词1", "keyword2", "关键词3", "keyword4", "关键词5"],
-  "search_terms": ["检索词1", "检索词2", "检索词3", "检索词4", "检索词5"],
   "relevance_hints": ["相关性提示1", "相关性提示2"]
 }}
 ```
@@ -389,7 +447,7 @@ class TopicParser:
             "model": model_name,
             "messages": [{"role": "user", "content": prompt}],
             "temperature": 0.3,
-            "max_tokens": 1000,
+            "max_tokens": 1500,
         }
 
         last_error = None
@@ -420,15 +478,42 @@ class TopicParser:
                         else:
                             raise ValueError("JSON 解析失败")
 
-                    print(f"[TopicParser] LLM 解析成功！领域: {parsed.get('domain')}, 关键词: {parsed.get('keywords', [])[:3]}...")
+                    print(f"[TopicParser] LLM 解析成功！领域: {parsed.get('domain')}")
+
+                    # 解析概念组
+                    concept_groups = {}
+                    concept_group_types = {}
+                    raw_concept_groups = parsed.get("concept_groups", {})
+
+                    for group_name, group_data in raw_concept_groups.items():
+                        if isinstance(group_data, dict):
+                            concept_groups[group_name] = group_data.get("terms", [])
+                            concept_group_types[group_name] = group_data.get("type", "optional")
+                        elif isinstance(group_data, list):
+                            concept_groups[group_name] = group_data
+                            concept_group_types[group_name] = "optional"
+
+                    # 从概念组中提取所有关键词
+                    all_keywords = []
+                    for terms in concept_groups.values():
+                        all_keywords.extend(terms[:3])  # 每组取前3个
+
+                    # 生成检索式（概念组组合）
+                    search_terms = self._generate_search_terms_from_concept_groups(concept_groups, concept_group_types)
+
+                    print(f"[TopicParser] 概念组数量: {len(concept_groups)}")
+                    print(f"[TopicParser] 必选组: {[k for k, v in concept_group_types.items() if v == 'required']}")
+                    print(f"[TopicParser] 可选组: {[k for k, v in concept_group_types.items() if v == 'optional']}")
 
                     return TopicAnalysis(
                         domain=parsed.get("domain", "综合学科"),
                         sub_domains=parsed.get("sub_domains", []),
-                        keywords=parsed.get("keywords", [])[:15],
-                        search_terms=parsed.get("search_terms", [])[:10],
-                        suggested_sections=self._suggest_sections(topic, parsed.get("domain", "综合学科"), parsed.get("keywords", [])),
+                        keywords=all_keywords[:15],
+                        search_terms=search_terms,
+                        suggested_sections=self._suggest_sections(topic, parsed.get("domain", "综合学科"), all_keywords),
                         relevance_hints=parsed.get("relevance_hints", []),
+                        concept_groups=concept_groups,
+                        concept_group_types=concept_group_types,
                     )
                 else:
                     last_error = f"HTTP {response.status_code}: {response.text[:200]}"
@@ -479,6 +564,60 @@ class TopicParser:
 
         print(f"[TopicParser] LLM 解析最终失败 ({max_retries} 次重试后)，回退到规则解析。最后错误: {last_error}")
         return self.parse(topic, user_description)
+
+    def _generate_search_terms_from_concept_groups(
+        self,
+        concept_groups: Dict[str, List[str]],
+        concept_group_types: Dict[str, str],
+    ) -> List[str]:
+        """Generate search terms from concept groups.
+
+        Args:
+            concept_groups: Dictionary of concept group name to list of terms.
+            concept_group_types: Dictionary of concept group name to type (required/optional).
+
+        Returns:
+            List of search term strings.
+        """
+        search_terms = []
+
+        # 分离必选组和可选组
+        required_groups = {k: v for k, v in concept_groups.items() if concept_group_types.get(k) == "required"}
+        optional_groups = {k: v for k, v in concept_groups.items() if concept_group_types.get(k) == "optional"}
+
+        # 策略1：所有必选组 AND 连接
+        if required_groups:
+            required_parts = []
+            for group_name, terms in required_groups.items():
+                if terms:
+                    # 每个概念组内取前2个词用 OR 连接
+                    group_query = " OR ".join(f'"{t}"' for t in terms[:2])
+                    required_parts.append(f"({group_query})")
+
+            if required_parts:
+                search_terms.append(" AND ".join(required_parts))
+
+        # 策略2：必选组 + 每个可选组组合
+        for opt_name, opt_terms in optional_groups.items():
+            if opt_terms and required_groups:
+                required_parts = []
+                for group_name, terms in required_groups.items():
+                    if terms:
+                        group_query = " OR ".join(f'"{t}"' for t in terms[:2])
+                        required_parts.append(f"({group_query})")
+
+                # 取可选组的前3个词
+                opt_query = " OR ".join(f'"{t}"' for t in opt_terms[:3])
+
+                search_terms.append(f"{' AND '.join(required_parts)} AND ({opt_query})")
+
+        # 策略3：每个概念组的单独检索式
+        for group_name, terms in concept_groups.items():
+            if terms:
+                group_query = " OR ".join(f'"{t}"' for t in terms[:4])
+                search_terms.append(f"({group_query})")
+
+        return search_terms[:10]
 
     async def parse_with_llm(self, topic: str, user_description: str = "") -> TopicAnalysis:
         """Parse topic using LLM for advanced analysis (async version).
