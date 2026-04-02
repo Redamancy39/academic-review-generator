@@ -985,8 +985,48 @@ def run_review_task(task_id: str, request: ReviewCreateRequest) -> None:
             task["awaiting_user_action"] = True
             task["status"] = "paused"
             task["message"] = f"已在 {pause_reason} 阶段暂停，等待用户审核确认"
-            # 更新暂停阶段的数据
-            task.update(pause_data)
+
+            # 处理暂停数据，转换为前端期望的格式
+            if pause_reason == "after_screening":
+                # 转换 selected_records 为 selected_papers_preview 格式
+                selected_records = pause_data.get("selected_records", [])
+                task["selected_records"] = selected_records
+                task["selected_papers_preview"] = [
+                    {
+                        "ref_id": r.get("ref_id", ""),
+                        "title": r.get("title", ""),
+                        "year": r.get("year"),
+                        "journal": r.get("journal", ""),
+                        "jcr_quartile": r.get("jcr_quartile", ""),
+                        "relevance_score": r.get("relevance_score", 0.0),
+                        "abstract_preview": (r.get("abstract", "") or "")[:200],
+                    }
+                    for r in selected_records[:50]  # 显示更多文献
+                ]
+                task["total_selected"] = pause_data.get("total_selected", len(selected_records))
+                task["total_retrieved"] = pause_data.get("total_retrieved", 0)
+                # 也保存原始检索结果
+                raw_records = pause_data.get("raw_records", [])
+                task["raw_records"] = raw_records
+                task["retrieved_papers_preview"] = [
+                    {
+                        "ref_id": r.get("ref_id", ""),
+                        "title": r.get("title", ""),
+                        "year": r.get("year"),
+                        "journal": r.get("journal", ""),
+                        "jcr_quartile": r.get("jcr_quartile", ""),
+                        "relevance_score": r.get("relevance_score", 0.0),
+                        "abstract_preview": (r.get("abstract", "") or "")[:200],
+                    }
+                    for r in raw_records[:50]
+                ]
+            elif pause_reason == "after_planning":
+                # 处理规划阶段数据
+                plan = pause_data.get("plan", {})
+                task["plan_sections"] = plan.get("sections", [])
+                task["topic_analysis"] = pause_data.get("topic_analysis", task.get("topic_analysis", {}))
+            else:
+                task.update(pause_data)
 
         # Run workflow
         runner = WorkflowRunner(
@@ -1251,7 +1291,46 @@ def resume_review_task(task_id: str, resume_from_stage: Optional[str] = None) ->
             task["awaiting_user_action"] = True
             task["status"] = "paused"
             task["message"] = f"已在 {pause_reason} 阶段暂停，等待用户审核确认"
-            task.update(pause_data)
+
+            # 处理暂停数据，转换为前端期望的格式
+            if pause_reason == "after_screening":
+                # 转换 selected_records 为 selected_papers_preview 格式
+                selected_records = pause_data.get("selected_records", [])
+                task["selected_records"] = selected_records
+                task["selected_papers_preview"] = [
+                    {
+                        "ref_id": r.get("ref_id", ""),
+                        "title": r.get("title", ""),
+                        "year": r.get("year"),
+                        "journal": r.get("journal", ""),
+                        "jcr_quartile": r.get("jcr_quartile", ""),
+                        "relevance_score": r.get("relevance_score", 0.0),
+                        "abstract_preview": (r.get("abstract", "") or "")[:200],
+                    }
+                    for r in selected_records[:50]
+                ]
+                task["total_selected"] = pause_data.get("total_selected", len(selected_records))
+                task["total_retrieved"] = pause_data.get("total_retrieved", 0)
+                raw_records = pause_data.get("raw_records", [])
+                task["raw_records"] = raw_records
+                task["retrieved_papers_preview"] = [
+                    {
+                        "ref_id": r.get("ref_id", ""),
+                        "title": r.get("title", ""),
+                        "year": r.get("year"),
+                        "journal": r.get("journal", ""),
+                        "jcr_quartile": r.get("jcr_quartile", ""),
+                        "relevance_score": r.get("relevance_score", 0.0),
+                        "abstract_preview": (r.get("abstract", "") or "")[:200],
+                    }
+                    for r in raw_records[:50]
+                ]
+            elif pause_reason == "after_planning":
+                plan = pause_data.get("plan", {})
+                task["plan_sections"] = plan.get("sections", [])
+                task["topic_analysis"] = pause_data.get("topic_analysis", task.get("topic_analysis", {}))
+            else:
+                task.update(pause_data)
 
         # Run workflow with resume enabled
         runner = WorkflowRunner(

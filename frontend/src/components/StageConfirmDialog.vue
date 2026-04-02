@@ -88,6 +88,19 @@
             <el-statistic title="选中文献" :value="selectedPapers.length" />
             <el-statistic title="目标文献" :value="targetRefs" />
           </div>
+          <!-- 文献不足警告 -->
+          <el-alert
+            v-if="selectedPapers.length < targetRefs"
+            :title="`选中文献数量（${selectedPapers.length}）低于目标数量（${targetRefs}）`"
+            type="warning"
+            :closable="false"
+            show-icon
+            style="margin-top: 15px"
+          >
+            <template #default>
+              建议检查检索关键词或从候选文献中添加更多文献。如仍无法达到目标，可以点击"确认继续"，系统将使用当前文献继续生成。
+            </template>
+          </el-alert>
         </div>
 
         <div class="review-section">
@@ -367,7 +380,9 @@ const sendChatMessage = async () => {
 // 操作按钮
 const canConfirm = computed(() => {
   if (props.pauseReason === 'after_screening') {
-    return localSelectedPapers.value.filter(p => p._selected).length >= 10
+    // 至少要有一些文献才能确认，但如果确实没有检索到文献，允许用户选择继续
+    const selectedCount = localSelectedPapers.value.filter(p => p._selected).length
+    return selectedCount >= 5 || (selectedCount > 0 && props.selectedPapers?.length <= 10)
   }
   return true
 })

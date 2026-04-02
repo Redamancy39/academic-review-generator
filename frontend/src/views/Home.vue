@@ -34,6 +34,21 @@
           :total-selected="store.currentTask.total_selected"
         />
 
+        <!-- 暂停状态下显示重新审核按钮 -->
+        <el-card v-if="store.currentTask?.is_paused && store.currentTask?.awaiting_user_action" class="paused-action-card" shadow="hover">
+          <div class="paused-content">
+            <el-icon class="warning-icon"><WarningFilled /></el-icon>
+            <div class="paused-info">
+              <h3>任务已暂停</h3>
+              <p>{{ getPauseMessage(store.currentTask?.pause_reason) }}</p>
+            </div>
+            <el-button type="primary" @click="showConfirmDialog = true">
+              <el-icon><Edit /></el-icon>
+              重新审核
+            </el-button>
+          </div>
+        </el-card>
+
         <!-- 使用说明 -->
         <el-card v-if="!store.currentTask" class="guide-card" shadow="hover">
           <template #header>
@@ -266,6 +281,15 @@ const handleAbort = async () => {
   }
 }
 
+// 获取暂停原因的中文描述
+const getPauseMessage = (reason) => {
+  const messages = {
+    'after_planning': '规划阶段完成，等待审核检索策略和章节结构',
+    'after_screening': '筛选阶段完成，等待审核选中的文献',
+  }
+  return messages[reason] || '等待审核确认'
+}
+
 onUnmounted(() => {
   if (pollInterval.value) {
     clearInterval(pollInterval.value)
@@ -299,6 +323,38 @@ onUnmounted(() => {
   margin: 0;
   font-size: 12px;
   color: #909399;
+}
+
+/* 暂停状态卡片 */
+.paused-action-card {
+  margin-bottom: 20px;
+  border: 2px solid #e6a23c;
+}
+
+.paused-content {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.warning-icon {
+  font-size: 40px;
+  color: #e6a23c;
+}
+
+.paused-info {
+  flex: 1;
+}
+
+.paused-info h3 {
+  margin: 0 0 4px 0;
+  color: #e6a23c;
+}
+
+.paused-info p {
+  margin: 0;
+  color: #909399;
+  font-size: 13px;
 }
 
 /* 结果预览区域 - 全宽显示在底部 */
