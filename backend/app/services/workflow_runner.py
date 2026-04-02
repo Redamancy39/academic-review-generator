@@ -1375,13 +1375,13 @@ class WorkflowRunner:
             self._save_json(f"review_round_{current_round}.json", to_jsonable(report))
 
             # Check if we should continue
-            # total_score 满分 60 分，54 分（90%）以上可以接受
+            # total_score 满分 70 分（7 个维度各 10 分），63 分（90%）以上可以接受
             # min_dimension_score 满分 10 分，8 分以下说明有明显短板
             must_continue = (
                 current_round < self.config.review_rounds_min
                 or report.has_blocking()
                 or report.min_dimension_score() < 8.0
-                or report.total_score() < 54.0  # 满分 60，90% 为 54 分
+                or report.total_score() < 63.0  # 满分 70，90% 为 63 分
             )
             if not must_continue or current_round >= self.config.review_rounds_max:
                 break
